@@ -25,6 +25,27 @@
 	bltz $s6, error
 .end_macro
 
+.macro ESTA_DICIONARIO(%char)
+Loop:	move $t8, $s4
+	add $t8, $t8, $s0
+	lb $t9, 0($t8)		#le um character
+	beq $t9, %char, encode
+	
+	#move $a0, $t3
+	#syscall
+	beq $t4, $s4, acabou
+	addi $s4, $s4, 1
+	j Loop
+acabou:
+	#sb $s0, (%char)
+.end_macro
+
+.macro TAMANHO(%cont, %tam, %vetor)
+tamanho: lb     %cont, %vetor(%tam)
+	add     %tam, %tam, 1
+	bne     %cont, $zero, tamanho
+.end_macro
+
 
 main:
 	#Mensagem para receber nome do arquivo
@@ -57,29 +78,26 @@ main:
 	la $a0, buffer
 	syscall
 	
-	move $t0, $s0
-	move $t1, $s1
+	#Pega o tamanho do buffer e guarda em $t1  --- acho q ele sai do vetor
+	TAMANHO($t0, $t1, buffer)
+	li $t0, 0		#reseta contador
 	
-	
-	#Pega o tamanho do buffer --- acho q ele sai do vetor
-	li $t3, 0
-tamanho: lb      $t2, buffer($t3)
-	add     $t3, $t3, 1
-	bne     $t2, $zero, tamanho
-	
+	#subi $t1, $t1, 1
+	li $v0, 11
 	
 	#Percorre o buffer
-Loop:	sll $t4, $s3, 2
-	add $t4, $t4, $s1
-	lb $t5, 0($t4)	
-	beq $t3, $s3, exit
+encode:	move $t2, $s3
+	add $t2, $t2, $s1
+	lb $t3, 0($t2)		#le um character
+	TAMANHO($t0, $t4, dicionario)
+	#ESTA_DICIONARIO($t3)
+	
+	#move $a0, $t3
+	#syscall
+	
+	beq $t1, $s3, exit
 	addi $s3, $s3, 1
-	j Loop
-	
-	
-	
-	
-	j exit
+	j encode
 	
 	
 		
