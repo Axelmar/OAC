@@ -1,11 +1,13 @@
 	.data
-	separador: .byte 0x1E
+	separador: .byte 0x1D
 	msg1: .asciiz "Digite o nome do arquivo a ser codificado:"
 	arquivo: .space 20
 	buffer: .space 1024
 	erro: .asciiz "Nao foi possivel abrir o arquivo"
 	dicionario: .space 1024
 	cadeia: .space 10
+	ext_saida: .asciiz ".lzw"
+	arq_saida: .space 25
 	
 	
 	
@@ -34,47 +36,84 @@ Loop:	move $t8, $s4
 	beqz $t9, acabou
 	beq $t9, $s3, achousep		#se for o separador
 	beq $t9, %char, continua
+	addi $s4, $s4, 1
 	j acabou
 
 	
 			
-achousep:addi $t8, $t8, 1
-	addi $t4, $t4, 1
+achousep:addi $s4, $s4, 1
+	addi $s2, $s2, 1
+	addi $t8, $t8, 1
 	lb $t9, 0($t8)
 	beq $t9, $t3, continua
 	beq $t3, $s3, acabou
 	j Loop
 	
-carregachar: move $t2, $s7
-	add $t2, $t2, $s1
-	lb $t3, 0($t2)		#le um character
-	jr $ra	
-
 acabou:
-	sb $s3, dicionario($t4)		#coloca o separador
+	sb $s3, 0($t7)		#coloca o separador
+	addi $t7, $t7, 1
 	jal strcpy
-	sb $s3, dicionario($t4)		#coloca o separador
-	li $v0, 1
-	move $a0, $t4
-	syscall
-	li $v0, 11
+	sb $s3, 0($t7)		#coloca o separador
+	ESCREVER_ARQUIVO($t4)
+	ESCREVER_ARQUIVO(%char)
+	li $v0, 15
 	move $a0, %char
 	syscall
 	li $t5, 0
 .end_macro
 
+.macro ESCREVER_ARQUIVO(%saida)
+	li $v0, 15
+	move $a0, $s6
+	move $a1, %saida
+	li $a2, 1
+	syscall
+.end_macro
+
+
+.macro ADICIONAR_EXTENSAO(%origem, %destino)
+	# empilhando
+    	addi $sp, $sp, -8  # 0x23bdfff4 desloca 12 bytes para inserir 3 palavras na pilha
+	sw %origem, 0($sp)		# 0xafa50004 empilha $a1 origem
+	sw %destino, 4($sp)     	# 0xafb00008 empilha $s0 contador
+	
+loop:
+	lb $s5, 0(%origem)		# 0x80b10000 $s1 = primeiro caracter da string origem
+	sb $s5, 0(%destino)		# 0xa0910000 memoria[a0] = $s1  (copia o caracter para a string destino)
+
+	addi %origem, %origem, 1	# 0x20a50001 incrementa endereco da string origem
+	addi %destino, %destino, 1	# 0x20840001 incrementa endereco da string destino
+
+	bne $s5, '.', loop 	# 0x1620fffb repita ate string origem encontrar o '\0'
+# final do loop
+	
+	la %origem, ext_saida
+ext:	lb $s5, 0(%origem)
+	sb $s5, 0(%destino)
+	
+	addi %origem, %origem, 1
+	addi %destino, %destino, 1
+	
+	bne $s5, $zero, ext
+	
+	#desempilhando
+	lw %origem, 4($sp)     	# 0x8fb00008 recupera $s0 original da pilha
+	lw %destino, 0($sp)		# 0x8fa50004 recupera $a1 original da pilha
+    	addi $sp, $sp, 8   # 0x23bd000c volta 12 bytes para retirar 3 palavras na pilha
+			
+.end_macro
 
 main:
 	#Mensagem para receber nome do arquivo
-#	li	$v0, 4
-#	la	$a0, msg1
-#	syscall
+	li	$v0, 4
+	la	$a0, msg1
+	syscall
 	
 	#Pega o nome do arquivo  #----------------- da erro na hora de abrir o arquivo
-#	li	$v0, 8
-#	la	$a0, arquivo
-#	li	$a1, 20
-#	syscall
+	li	$v0, 8
+	la	$a0, arquivo
+	li	$a1, 20
+	syscall
 	
 
 	#Abre o arquivo para compilação
@@ -87,28 +126,28 @@ main:
 	li $a2, 20	# numero de caracteres a serem lidos
 	syscall
 	
+	li $v0, 16
+	syscall
+	
+	## Abre arquivo de saida para escrita
+	la $t6, arquivo
+	la $t7, arq_saida
+	ADICIONAR_EXTENSAO($t6, $t7)
+	ABRIR_ARQUIVO(arq_saida, 1, 0)	
+	
 	############################################################################### LW78
 	la $s0, dicionario
 	la $s1, buffer
 	la $s2, cadeia
 	la $s3, separador
 	move $t0, $v0			#t0 recebe o tamanho do buffer
-	
-	########## VENDO O Q TEM NO BUFFER
-	li $v0, 4
-	la $a0, buffer
-	syscall
+	move $t7, $s0
 
-	
-	#subi $t1, $t1, 1
-	li $v0, 11
-	
 	#Percorre o buffer
 encode:	move $t2, $s7
 	add $t2, $t2, $s1
 	lb $t3, 0($t2)		#le um character
 	sb $t3, 0($s2)
-	addi $s2, $s2, 1
 	ESTA_DICIONARIO($t3)
 continua: 
 	
@@ -129,24 +168,22 @@ continua:
 strcpy:	
 	# empilhando
     	addi $sp, $sp, -8  # 0x23bdfff4 desloca 12 bytes para inserir 3 palavras na pilha
-	#sw $s0, 0($sp)		# 0xafa40000 empilha $a0 destino
 	sw $s2, 0($sp)		# 0xafa50004 empilha $a1 origem
 	sw $a3, 4($sp)     	# 0xafb00008 empilha $s0 contador
 	
 loop:
-	lb $s4, 0($s2)		# 0x80b10000 $s1 = primeiro caracter da string origem
-	sb $s4, 0($s0)		# 0xa0910000 memoria[a0] = $s1  (copia o caracter para a string destino)
+	lb $s5, 0($s2)		# 0x80b10000 $s1 = primeiro caracter da string origem
+	sb $s5, 0($t7)		# 0xa0910000 memoria[a0] = $s1  (copia o caracter para a string destino)
 
 	addi $s2, $s2, 1	# 0x20a50001 incrementa endereco da string origem
-	addi $s0, $s0, 1	# 0x20840001 incrementa endereco da string destino
+	addi $t7, $t7, 1	# 0x20840001 incrementa endereco da string destino
 
-	bne $s4, $zero, loop 	# 0x1620fffb repita ate string origem encontrar o '\0'
+	bne $s5, $zero, loop 	# 0x1620fffb repita ate string origem encontrar o '\0'
 # final do loop
 	
 	#desempilhando
 	lw $a3, 4($sp)     	# 0x8fb00008 recupera $s0 original da pilha
 	lw $s2, 0($sp)		# 0x8fa50004 recupera $a1 original da pilha
-	#lw $s0, 0($sp)		# 0x8fa40000 recupera $a0 original da pilha
     addi $sp, $sp, 8   # 0x23bd000c volta 12 bytes para retirar 3 palavras na pilha
 		
 	jr $ra				# 0x03e00008 retona para a main	
@@ -157,10 +194,5 @@ error: li $v0, 4
 	syscall		
 	
 exit:
-	################# testar dicionario apagar dps
-	li $v0, 4
-	la $a0, dicionario
-	syscall
-	#################
 	li $v0, 10
 	syscall
