@@ -1,10 +1,10 @@
 	.data
-	separador: .byte 0x1E
 	msg1: .asciiz "Digite o nome do arquivo a ser codificado:"
 	arquivo: .space 20
 	buffer: .space 1024
 	erro: .asciiz "Nao foi possivel abrir o arquivo"
-	dicionario: .space 1024
+	fdic: .asciiz "dicionario.txt"
+	dicionario: .space 20
 	cadeia: .space 10
 	
 	
@@ -28,11 +28,10 @@
 .end_macro
 
 .macro ESTA_DICIONARIO(%char)
-Loop:	move $t8, $s4
+Loop:	LE_ARQUIVO(dicionario, 10)
+move $t8, $s4
 	add $t8, $t8, $s0
-	lb $t9, 0($t8)		#le um character do dicionario
-	
-	
+	lb $t9, 0($t8)		#le um character
 	beq $t9, %char, existe	
 	beq $t4, $s4, acabou
 	addi $s4, $s4, 1
@@ -43,23 +42,16 @@ existe:	sb %char, cadeia($t5)		#se existe guarda o char na cadeia
 	move $s7, $s4			#salva o index de referencia
 	j continua
 acabou:
-	#sb separador, dicionario($t4)		#coloca o separador
-	jal strcpy
-	#sw separador, dicionario($t4)		#coloca o separador
-	li $v0, 1
-	move $a0, $t4
-	syscall
-	li $v0, 11
-	move $a0, %char
-	syscall
-	li $t5, 0
-	addi $t4, $t4, 1
+
 .end_macro
 
-.macro TAMANHO(%cond, %tam, %vetor)
-tamanho: lb     %cond, %vetor(%tam)
-	add     %tam, %tam, 1
-	bne     %cond, $zero, tamanho
+.macro ESCREVER_ARQUIVO(%string, %tam)
+	#Escrever no arquivo
+	li $v0, 15
+	move $a0, $s6
+	la $a1, %string
+	move $a2, %tam
+	syscall
 .end_macro
 
 
@@ -86,21 +78,21 @@ main:
 	li $a2, 20	# numero de caracteres a serem lidos
 	syscall
 	
+	move $t1, $v0	#tamanho do buffer
+	
+	li $v0, 16
+	syscall
+	ABRIR_ARQUIVO(fdic, 0, 0)
+	
 	############################################################################### LW78
-	la $s0, dicionario
 	la $s1, buffer
-	la $s2, cadeia
+	
 	
 	########## VENDO O Q TEM NO BUFFER
 	li $v0, 4
 	la $a0, buffer
 	syscall
 	
-	#Pega o tamanho do buffer e guarda em $t1  --- acho q ele sai da string
-	TAMANHO($t0, $t1, buffer)
-
-	
-	#subi $t1, $t1, 1
 	li $v0, 11
 	
 	#Percorre o buffer
@@ -108,7 +100,6 @@ encode:	move $t2, $s3
 	add $t2, $t2, $s1
 	lb $t3, 0($t2)		#le um character
 	li $s4, 0
-	sb $t3, cadeia
 	ESTA_DICIONARIO($t3)
 continua: 
 	
@@ -119,37 +110,7 @@ continua:
 	beq $t1, $s3, exit		#s3 eh o contador t1 eh o tamanho
 	addi $s3, $s3, 1
 	j encode
-
 	
-		
-			
-				
-					
-						
-strcpy:	
-	# empilhando
-    	addi $sp, $sp, -8  # 0x23bdfff4 desloca 12 bytes para inserir 3 palavras na pilha
-	#sw $s0, 0($sp)		# 0xafa40000 empilha $a0 destino
-	sw $s2, 0($sp)		# 0xafa50004 empilha $a1 origem
-	sw $a3, 4($sp)     	# 0xafb00008 empilha $s0 contador
-	
-loop:
-	lb $s4, 0($s2)		# 0x80b10000 $s1 = primeiro caracter da string origem
-	sb $s4, 0($s0)		# 0xa0910000 memoria[a0] = $s1  (copia o caracter para a string destino)
-
-	addi $s2, $s2, 1	# 0x20a50001 incrementa endereco da string origem
-	addi $s0, $s0, 1	# 0x20840001 incrementa endereco da string destino
-
-	bne $s4, $zero, loop 	# 0x1620fffb repita ate string origem encontrar o '\0'
-# final do loop
-	
-	#desempilhando
-	lw $a3, 4($sp)     	# 0x8fb00008 recupera $s0 original da pilha
-	lw $s2, 0($sp)		# 0x8fa50004 recupera $a1 original da pilha
-	#lw $s0, 0($sp)		# 0x8fa40000 recupera $a0 original da pilha
-    addi $sp, $sp, 8   # 0x23bd000c volta 12 bytes para retirar 3 palavras na pilha
-		
-	jr $ra				# 0x03e00008 retona para a main	
 	
 		
 error: li $v0, 4
@@ -157,10 +118,5 @@ error: li $v0, 4
 	syscall		
 	
 exit:
-	################# testar dicionario apagar dps
-	li $v0, 4
-	la $a0, dicionario
-	syscall
-	#################
 	li $v0, 10
 	syscall
