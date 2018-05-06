@@ -1,0 +1,2 @@
+faz index e dicionario separados
+saida seria index + dicionario

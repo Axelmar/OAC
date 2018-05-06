@@ -4,11 +4,11 @@
 	buffer: .space 1024
 	erro: .asciiz "Nao foi possivel abrir o arquivo"
 	dicionario: .space 1024
-	index: .word 0
+	cadeia: .space 10
 	
 	
 	
-	data1: .asciiz "data1.txt"
+	data1: .asciiz "teste.txt"
 	
 	.text	
 	.globl main
@@ -30,16 +30,27 @@
 Loop:	move $t8, $s4
 	add $t8, $t8, $s0
 	lb $t9, 0($t8)		#le um character
-	beq $t9, %char, continua
-	
-	#move $a0, $t3
-	#syscall
+	beq $t9, %char, existe
 	beq $t4, $s4, acabou
 	addi $s4, $s4, 1
 	j Loop
+	
+existe:	sb %char, cadeia($t5)		#se existe guarda o char na cadeia
+	addi $t5, $t5, 1
+	move $s7, $s4			#salva o index de referencia
+	j continua
 acabou:
+	sb $t4, dicionario($t4)
 	sb %char, dicionario($t4)
+	li $v0, 1
+	move $a0, $t5
+	syscall
+	li $v0, 11
+	move $a0, %char
+	syscall
+	li $t5, 0
 	addi $t4, $t4, 1
+	move $t5, $s4		#index
 .end_macro
 
 .macro TAMANHO(%cond, %tam, %vetor)
@@ -69,20 +80,21 @@ main:
 	li $v0, 14	# system call for read from file
 	move $a0, $s6	# file descriptor
 	la $a1, buffer	# endereço do input buffer
-	li $a2, 3	# numero de caracteres a serem lidos
+	li $a2, 20	# numero de caracteres a serem lidos
 	syscall
 	
 	############################################################################### LW78
 	la $s0, dicionario
 	la $s1, buffer
 	
+	########## VENDO O Q TEM NO BUFFER
 	li $v0, 4
 	la $a0, buffer
 	syscall
 	
-	#Pega o tamanho do buffer e guarda em $t1  --- acho q ele sai do vetor
+	#Pega o tamanho do buffer e guarda em $t1  --- acho q ele sai da string
 	TAMANHO($t0, $t1, buffer)
-	li $t0, 0		#reseta contador
+
 	
 	#subi $t1, $t1, 1
 	li $v0, 11
@@ -91,6 +103,7 @@ main:
 encode:	move $t2, $s3
 	add $t2, $t2, $s1
 	lb $t3, 0($t2)		#le um character
+	li $s4, 0
 	ESTA_DICIONARIO($t3)
 continua: 
 	
