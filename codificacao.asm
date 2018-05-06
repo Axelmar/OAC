@@ -6,12 +6,10 @@
 	erro: .asciiz "Nao foi possivel abrir o arquivo"
 	dicionario: .space 1024
 	cadeia: .space 10
-	ext_saida: .asciiz ".lzw"
+	ext_saida: .asciiz "lzw"
 	arq_saida: .space 25
-	
-	
-	
-	data1: .asciiz "teste.txt"
+	enter: .asciiz "\n"
+	barra_zero: .asciiz "\0"
 	
 	.text	
 	.globl main
@@ -27,6 +25,14 @@
 	syscall            # open a file (file descriptor returned in $v0)
 	move $s6, $v0      # save the file descriptor
 	bltz $s6, error
+.end_macro
+
+.macro ESCREVER_ARQUIVO()
+	li $v0, 15
+	move $a0, $s6
+	la $a1, 0($sp)
+	li $a2, 1
+	syscall
 .end_macro
 
 .macro ESTA_DICIONARIO(%char)
@@ -54,20 +60,10 @@ acabou:
 	addi $t7, $t7, 1
 	jal strcpy
 	sb $s3, 0($t7)		#coloca o separador
+	
 	ESCREVER_ARQUIVO($t4)
 	ESCREVER_ARQUIVO(%char)
-	li $v0, 15
-	move $a0, %char
-	syscall
 	li $t5, 0
-.end_macro
-
-.macro ESCREVER_ARQUIVO(%saida)
-	li $v0, 15
-	move $a0, $s6
-	move $a1, %saida
-	li $a2, 1
-	syscall
 .end_macro
 
 
@@ -115,9 +111,23 @@ main:
 	li	$a1, 20
 	syscall
 	
+	la $t0, arquivo
+ 	lb $t2, enter	 # save '\n' for comparison
+ 	lb $t3, barra_zero # save \0 for string cleaning
+enquanto_nao_enter:
+       	lb   $t1, 0($t0)
+	beq  $t1, $t2, Limpando
+       	addi $t0, $t0, 1
+       	j enquanto_nao_enter
+       	       		
+Limpando:
+	la $t1, arquivo
+	sub $s7, $t0, $t1  #$s7 now contains the length of txt file string
+	sb $t3, 0($t0)
+	
 
 	#Abre o arquivo para compilação
-	ABRIR_ARQUIVO(data1, 0, 0)
+	ABRIR_ARQUIVO(arquivo, 0, 0)
 	
 	#Le o arquivo
 	li $v0, 14	# system call for read from file
@@ -133,6 +143,7 @@ main:
 	la $t6, arquivo
 	la $t7, arq_saida
 	ADICIONAR_EXTENSAO($t6, $t7)
+
 	ABRIR_ARQUIVO(arq_saida, 1, 0)	
 	
 	############################################################################### LW78
