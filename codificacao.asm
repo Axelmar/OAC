@@ -31,21 +31,29 @@
 Loop:	move $t8, $s4
 	add $t8, $t8, $s0
 	lb $t9, 0($t8)		#le um character do dicionario
+	beqz $t9, acabou
+	beq $t9, $s3, achousep		#se for o separador
+	beq $t9, %char, continua
+	j acabou
+
 	
-	
-	beq $t9, %char, existe	
-	beq $t4, $s4, acabou
-	addi $s4, $s4, 1
+			
+achousep:addi $t8, $t8, 1
+	addi $t4, $t4, 1
+	lb $t9, 0($t8)
+	beq $t9, $t3, continua
+	beq $t3, $s3, acabou
 	j Loop
 	
-existe:	sb %char, cadeia($t5)		#se existe guarda o char na cadeia
-	addi $t5, $t5, 1
-	move $s7, $s4			#salva o index de referencia
-	j continua
+carregachar: move $t2, $s7
+	add $t2, $t2, $s1
+	lb $t3, 0($t2)		#le um character
+	jr $ra	
+
 acabou:
-	#sb separador, dicionario($t4)		#coloca o separador
+	sb $s3, dicionario($t4)		#coloca o separador
 	jal strcpy
-	#sw separador, dicionario($t4)		#coloca o separador
+	sb $s3, dicionario($t4)		#coloca o separador
 	li $v0, 1
 	move $a0, $t4
 	syscall
@@ -53,13 +61,6 @@ acabou:
 	move $a0, %char
 	syscall
 	li $t5, 0
-	addi $t4, $t4, 1
-.end_macro
-
-.macro TAMANHO(%cond, %tam, %vetor)
-tamanho: lb     %cond, %vetor(%tam)
-	add     %tam, %tam, 1
-	bne     %cond, $zero, tamanho
 .end_macro
 
 
@@ -90,25 +91,24 @@ main:
 	la $s0, dicionario
 	la $s1, buffer
 	la $s2, cadeia
+	la $s3, separador
+	move $t0, $v0			#t0 recebe o tamanho do buffer
 	
 	########## VENDO O Q TEM NO BUFFER
 	li $v0, 4
 	la $a0, buffer
 	syscall
-	
-	#Pega o tamanho do buffer e guarda em $t1  --- acho q ele sai da string
-	TAMANHO($t0, $t1, buffer)
 
 	
 	#subi $t1, $t1, 1
 	li $v0, 11
 	
 	#Percorre o buffer
-encode:	move $t2, $s3
+encode:	move $t2, $s7
 	add $t2, $t2, $s1
 	lb $t3, 0($t2)		#le um character
-	li $s4, 0
-	sb $t3, cadeia
+	sb $t3, 0($s2)
+	addi $s2, $s2, 1
 	ESTA_DICIONARIO($t3)
 continua: 
 	
@@ -116,8 +116,8 @@ continua:
 	#move $a0, $t3
 	#syscall
 	
-	beq $t1, $s3, exit		#s3 eh o contador t1 eh o tamanho
-	addi $s3, $s3, 1
+	beq $t0, $s7, exit		#s3 eh o contador t0 eh o tamanho
+	addi $s7, $s7, 1
 	j encode
 
 	
