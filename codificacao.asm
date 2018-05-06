@@ -4,6 +4,7 @@
 	buffer: .space 1024
 	erro: .asciiz "Nao foi possivel abrir o arquivo"
 	dicionario: .space 1024
+	index: .word 0
 	
 	
 	
@@ -29,7 +30,7 @@
 Loop:	move $t8, $s4
 	add $t8, $t8, $s0
 	lb $t9, 0($t8)		#le um character
-	beq $t9, %char, encode
+	beq $t9, %char, continua
 	
 	#move $a0, $t3
 	#syscall
@@ -37,13 +38,14 @@ Loop:	move $t8, $s4
 	addi $s4, $s4, 1
 	j Loop
 acabou:
-	#sb $s0, (%char)
+	sb %char, dicionario($t4)
+	addi $t4, $t4, 1
 .end_macro
 
-.macro TAMANHO(%cont, %tam, %vetor)
-tamanho: lb     %cont, %vetor(%tam)
+.macro TAMANHO(%cond, %tam, %vetor)
+tamanho: lb     %cond, %vetor(%tam)
 	add     %tam, %tam, 1
-	bne     %cont, $zero, tamanho
+	bne     %cond, $zero, tamanho
 .end_macro
 
 
@@ -89,13 +91,14 @@ main:
 encode:	move $t2, $s3
 	add $t2, $t2, $s1
 	lb $t3, 0($t2)		#le um character
-	TAMANHO($t0, $t4, dicionario)
-	#ESTA_DICIONARIO($t3)
+	ESTA_DICIONARIO($t3)
+continua: 
+	
 	
 	#move $a0, $t3
 	#syscall
 	
-	beq $t1, $s3, exit
+	beq $t1, $s3, exit		#s3 eh o contador t1 eh o tamanho
 	addi $s3, $s3, 1
 	j encode
 	
@@ -106,5 +109,10 @@ error: li $v0, 4
 	syscall		
 	
 exit:
+	################# testar dicionario apagar dps
+	li $v0, 4
+	la $a0, dicionario
+	syscall
+	#################
 	li $v0, 10
 	syscall
